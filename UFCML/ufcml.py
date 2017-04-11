@@ -16,7 +16,7 @@ from sklearn.naive_bayes import GaussianNB
 # Get the accuracy score of the final model
 from sklearn.metrics import accuracy_score
 # Split the training set into train and test
-from sklearn.cross_validation import train_test_split
+from sklearn.model_selection import train_test_split
 #MLP Classifer
 from sklearn.neural_network import MLPClassifier
 from sklearn.neighbors import KNeighborsClassifier
@@ -264,10 +264,10 @@ def predict(f1id=2646,f2id=13767):
 
     df = convert_text(df)
 
-    df0 = df.interpolate()
-    df0 = df.interpolate(method='spline', order=2)
+    #df0 = df.interpolate()
+    #df0 = df.interpolate(method='spline', order=2)
     df = df.interpolate(method='pchip')
-    df0 = df.dropna()
+    df = df.dropna()
 
     if SUBSET_FEATURES:
         subset = ['fid','strike_offense_per_min','strike_defense_per_min','association','wins','losses']
@@ -284,9 +284,11 @@ def predict(f1id=2646,f2id=13767):
 
 
     feat_vector = np.append(f1.values,f2.values)
+    feat_vector = feat_vector.reshape(1, -1)
 
     if NORMILIZE:
         feat_vector = preprocessing.normalize(feat_vector, norm='l2')
+
 
     #Load the saved classifiers
     with open(CURRDIR + "/main-clfs.pickle","rb") as f:
@@ -304,12 +306,11 @@ def predict(f1id=2646,f2id=13767):
          "Voting"
         ]
 
-    for index,clf in enumerate(clfs):
-        print(names[index],clf.predict_proba(feat_vector))
+    # for index,clf in enumerate(clfs):
+    #     print(names[index],clf.predict_proba(feat_vector))
 
     #Return the combined voting answer
-    return clfs[-1].predict_proba(feat_vector)
-
+    return clfs[-1].predict_proba(feat_vector)[0]
 
 #TODO: turn this into a generic function
 def convert_text(df):

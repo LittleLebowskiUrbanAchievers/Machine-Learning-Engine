@@ -1,3 +1,3 @@
 from UFCML import ufcml
 
-ufcml.predict()
+print(ufcml.predict())
