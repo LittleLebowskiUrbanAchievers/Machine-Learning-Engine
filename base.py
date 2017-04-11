@@ -43,7 +43,7 @@ SEPERATE_CLASSIFIERS = True
 
 #Combining output
 NN_COMBINE = True
-VOTING_CLASSIFIERS = False
+VOTING_CLASSIFIERS = True
 
 
 def train_models():
@@ -225,7 +225,7 @@ def train_models():
 
 
 
-def predict(f1id=12078,f2id=258):
+def predict(f1id=2646,f2id=13767):
     ## Selection how to interpolate the missing data
 
     try:
@@ -270,6 +270,7 @@ def predict(f1id=12078,f2id=258):
         subset = ['fid','strike_offense_per_min','strike_defense_per_min','association','wins','losses']
         df = df[subset]
 
+
     f1 = df[df['fid'] == f1id].drop('fid',axis=1)
     f2 = df[df['fid'] == f2id].drop('fid',axis=1)
 
@@ -278,32 +279,33 @@ def predict(f1id=12078,f2id=258):
         print("Something is wrong with pulling out the stuff")
         exit(-1)
 
+
     feat_vector = np.append(f1.values,f2.values)
 
+    if NORMILIZE:
+        feat_vector = preprocessing.normalize(feat_vector, norm='l2')
 
     #Load the saved classifiers
-    with open("clfs-1.pickle","rb") as f:
+    with open("main-clfs.pickle","rb") as f:
         clfs = pickle.load(f)
 
     names = [
          "MLP",
-         "Naive Bayes",
+         #"Naive Bayes",
          "KNN",
          "SVM Linear",
          "SVM gamma",
-         "Decsion Tree",
-         "Random Forest",
-         "adaBoost"
+         #"Decsion Tree",
+         #"Random Forest",
+         #"adaBoost",
+         "Voting"
         ]
 
-    print(np.argmax(clfs[0].predict_proba(feat_vector)))
+    for index,clf in enumerate(clfs):
+        print(names[index],clf.predict_proba(feat_vector))
 
-    if VOTING_CLASSIFIERS:
-        clf_vote = VotingClassifier(estimators=list(zip(names,clfs)),voting='soft')
-        clf_vote.fit(X_train,y_train)
-        preds = clf_vote.predict(X_test)
-        print("%.2f" % (accuracy_score(preds,y_test) * 100))
-
+    #Return the combined voting answer
+    return clfs[-1].predict_proba(feat_vector)
 
 
 #TODO: turn this into a generic function
