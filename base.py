@@ -42,7 +42,7 @@ SEPERATE_CLASSIFIERS = True
 
 #Combining output
 NN_COMBINE = True
-VOTING_CLASSIFIERS = True
+VOTING_CLASSIFIERS = False
 
 
 def train_models():
@@ -224,7 +224,7 @@ def train_models():
 
 
 
-def predict(f1id,f2id):
+def predict(f1id=12078,f2id=258):
     ## Selection how to interpolate the missing data
 
     try:
@@ -234,7 +234,8 @@ def predict(f1id,f2id):
 
     cur = conn.cursor()
 
-    sql = "select height_inches, \
+    sql = "select fid, \
+                height_inches, \
                 reach_inches, \
                 weight_lbs, \
                 strike_offense_per_min, \
@@ -252,7 +253,7 @@ def predict(f1id,f2id):
                 losses, \
                 total_fights FROM octagon.fighters"
 
-    df = pd.read_sql_query(sql + str(f1id), conn)
+    df = pd.read_sql_query(sql, conn)
 
     #df1 = pd.read_sql_query(sql + " WHERE fid = " + str(f1id), conn)
     #df2 = pd.read_sql_query(sql + " WHERE fid = " + str(f2id), conn)
@@ -260,26 +261,47 @@ def predict(f1id,f2id):
 
 
     df0 = df.interpolate()
-    df0 = df.dropna()
     df0 = df.interpolate(method='spline', order=2)
     df = df.interpolate(method='pchip')
+    df0 = df.dropna()
+
+    f1 = df[df['fid'] == f1id].drop('fid',axis=1).values
+    f2 = df[df['fid'] == f2id].drop('fid',axis=1).values
+
+    if f1.empty or f2.empty:
+        print("Something is wrong with pulling out the stuff")
+        exit(-1)
+
+
+    #Load the saved classifiers
+    # with open("clfs-1.pickle","rb") as f:
+    #     clfs = pickle.load(f)
+
+
+    if VOTING_CLASSIFIERS:
+        clf_vote = VotingClassifier(estimators=list(zip(names,clfs)),voting='soft')
+        clf_vote.fit(X_train,y_train)
+        preds = clf_vote.predict(X_test)
+        print("%.2f" % (accuracy_score(preds,y_test) * 100))
+
 
 
 #TODO: turn this into a generic function
 def convert_text(df):
 
-    country_names = list((df['f1_country'].append(df['f2_country'])).unique())
-    df['f1_country'] = df['f1_country'].apply(lambda x: country_names.index(x) / len(country_names))
-    df['f2_country'] = df['f2_country'].apply(lambda x: country_names.index(x) / len(country_names))
+    with open('text_based_names.pickle','rb') as f:
+        names = pickle.load(f)
+
+    text_based = ['country','association']
+
+    for index, name in enumerate(text_based):
+        df[name] = df[name].apply(lambda x: names[index].index(x) / len(names[index]))
 
 
-    asso_names = list((df['f1_association'].append(df['f2_association'])).unique())
-    df['f1_association'] = df['f1_association'].apply(lambda x: asso_names.index(x) / len(asso_names))
-    df['f2_association'] = df['f2_association'].apply(lambda x: asso_names.index(x) / len(asso_names))
 
     return df
 
-
-
+if __name__ == '__main__':
+    predict()
 
 
