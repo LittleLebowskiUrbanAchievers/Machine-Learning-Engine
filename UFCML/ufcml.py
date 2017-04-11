@@ -7,6 +7,7 @@ import scipy
 import math
 import pickle
 import numpy as np
+import os
 
 ################# Sklearn Imports #####################
 from sklearn import datasets
@@ -29,6 +30,8 @@ from sklearn.feature_selection import RFE
 
 
 ############## Paramater Switches ##############
+
+CURRDIR = os.path.dirname(os.path.abspath(__file__))
 
 #Scaling
 NORMILIZE = True
@@ -286,7 +289,7 @@ def predict(f1id=2646,f2id=13767):
         feat_vector = preprocessing.normalize(feat_vector, norm='l2')
 
     #Load the saved classifiers
-    with open("main-clfs.pickle","rb") as f:
+    with open(CURRDIR + "/main-clfs.pickle","rb") as f:
         clfs = pickle.load(f)
 
     names = [
@@ -310,9 +313,10 @@ def predict(f1id=2646,f2id=13767):
 
 #TODO: turn this into a generic function
 def convert_text(df):
+    currDir = os.path.dirname(os.path.abspath(__file__))
 
     #Grab the recored names for the percentages
-    with open('text_based_names.pickle','rb') as f:
+    with open(CURRDIR + '/text_based_names.pickle','rb') as f:
         names = pickle.load(f)
 
     #The preprocessed text fields
@@ -323,6 +327,7 @@ def convert_text(df):
         df[name] = df[name].apply(lambda x: names[index].index(x) / len(names[index]))
 
     return df
+
 
 if __name__ == '__main__':
     predict()
