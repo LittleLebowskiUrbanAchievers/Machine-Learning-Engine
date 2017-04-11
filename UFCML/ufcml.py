@@ -31,6 +31,8 @@ from sklearn.feature_selection import RFE
 
 ############## Paramater Switches ##############
 
+#### NEVER TOUCH ANY OF THESE!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 CURRDIR = os.path.dirname(os.path.abspath(__file__))
 
 #Scaling
@@ -227,10 +229,15 @@ def train_models():
 
 
 
-
+# Predict who will when in a UFC fight
+# \param f1id: id for the first fighter
+#\param f2id: id for the second fighter
+#\return: array with probabilites of winning [fighter1,fighter2,Uncertainty]
 def predict(f1id=2646,f2id=13767):
-    ## Selection how to interpolate the missing data
 
+
+    #Open a connection to the database
+    #TODO: Use env varibles for the connectoin strings
     try:
         conn = psycopg2.connect("dbname='capstone' user='samkreter' host='localhost'")
     except:
@@ -238,6 +245,7 @@ def predict(f1id=2646,f2id=13767):
 
     cur = conn.cursor()
 
+    #Big ass sql string
     sql = "select fid, \
                 height_inches, \
                 reach_inches, \
@@ -257,35 +265,41 @@ def predict(f1id=2646,f2id=13767):
                 losses, \
                 total_fights FROM octagon.fighters"
 
+    #Read all fighters in from the database.
+    #TODO: find a better way for interpolation
     df = pd.read_sql_query(sql, conn)
 
-    #df1 = pd.read_sql_query(sql + " WHERE fid = " + str(f1id), conn)
-    #df2 = pd.read_sql_query(sql + " WHERE fid = " + str(f2id), conn)
 
+    #convert the text fields into numeric values
     df = convert_text(df)
 
-    #df0 = df.interpolate()
-    #df0 = df.interpolate(method='spline', order=2)
+    #Interpolate the data to fill in the missing values
     df = df.interpolate(method='pchip')
     df = df.dropna()
 
+    #Take a subset of the features found in the feature selection process
     if SUBSET_FEATURES:
         subset = ['fid','strike_offense_per_min','strike_defense_per_min','association','wins','losses']
         df = df[subset]
 
-
+    #Pull out the fighters that we want and remove their id field
     f1 = df[df['fid'] == f1id].drop('fid',axis=1)
     f2 = df[df['fid'] == f2id].drop('fid',axis=1)
 
 
+    #Error out if the fighter could not be found after data cleaning
     if f1.empty or f2.empty:
         print("Something is wrong with pulling out the stuff")
         exit(-1)
 
 
+    #Create a feature vector from the two fighters data
     feat_vector = np.append(f1.values,f2.values)
+
+    #Reshape the data to make sklearn feel better about itself and not give a warning
     feat_vector = feat_vector.reshape(1, -1)
 
+    #Normilize the input vectors since the classifiers are trained on normilized data
     if NORMILIZE:
         feat_vector = preprocessing.normalize(feat_vector, norm='l2')
 
@@ -294,27 +308,30 @@ def predict(f1id=2646,f2id=13767):
     with open(CURRDIR + "/main-clfs.pickle","rb") as f:
         clfs = pickle.load(f)
 
+
+    #Names for each of the classifiers
     names = [
          "MLP",
-         #"Naive Bayes",
          "KNN",
          "SVM Linear",
          "SVM gamma",
-         #"Decsion Tree",
-         #"Random Forest",
-         #"adaBoost",
          "Voting"
         ]
 
+
+    #TODO: take into account the individule values
     # for index,clf in enumerate(clfs):
     #     print(names[index],clf.predict_proba(feat_vector))
 
     #Return the combined voting answer
     return clfs[-1].predict_proba(feat_vector)[0]
 
-#TODO: turn this into a generic function
+
+# Convert text fields into a numeric in the interval [0,1] based on the index
+# \param df: dataframe that should be converted
+# \return: the dataframe with the converted values
 def convert_text(df):
-    currDir = os.path.dirname(os.path.abspath(__file__))
+
 
     #Grab the recored names for the percentages
     with open(CURRDIR + '/text_based_names.pickle','rb') as f:
@@ -327,10 +344,9 @@ def convert_text(df):
     for index, name in enumerate(text_based):
         df[name] = df[name].apply(lambda x: names[index].index(x) / len(names[index]))
 
+
     return df
 
 
-if __name__ == '__main__':
-    predict()
 
 
