@@ -6,6 +6,7 @@ import psycopg2
 import scipy
 import math
 import pickle
+import numpy as np
 
 ################# Sklearn Imports #####################
 from sklearn import datasets
@@ -258,25 +259,44 @@ def predict(f1id=12078,f2id=258):
     #df1 = pd.read_sql_query(sql + " WHERE fid = " + str(f1id), conn)
     #df2 = pd.read_sql_query(sql + " WHERE fid = " + str(f2id), conn)
 
-
+    df = convert_text(df)
 
     df0 = df.interpolate()
     df0 = df.interpolate(method='spline', order=2)
     df = df.interpolate(method='pchip')
     df0 = df.dropna()
 
-    f1 = df[df['fid'] == f1id].drop('fid',axis=1).values
-    f2 = df[df['fid'] == f2id].drop('fid',axis=1).values
+    if SUBSET_FEATURES:
+        subset = ['fid','strike_offense_per_min','strike_defense_per_min','association','wins','losses']
+        df = df[subset]
+
+    f1 = df[df['fid'] == f1id].drop('fid',axis=1)
+    f2 = df[df['fid'] == f2id].drop('fid',axis=1)
+
 
     if f1.empty or f2.empty:
         print("Something is wrong with pulling out the stuff")
         exit(-1)
 
+    feat_vector = np.append(f1.values,f2.values)
+
 
     #Load the saved classifiers
-    # with open("clfs-1.pickle","rb") as f:
-    #     clfs = pickle.load(f)
+    with open("clfs-1.pickle","rb") as f:
+        clfs = pickle.load(f)
 
+    names = [
+         "MLP",
+         "Naive Bayes",
+         "KNN",
+         "SVM Linear",
+         "SVM gamma",
+         "Decsion Tree",
+         "Random Forest",
+         "adaBoost"
+        ]
+
+    print(np.argmax(clfs[0].predict_proba(feat_vector)))
 
     if VOTING_CLASSIFIERS:
         clf_vote = VotingClassifier(estimators=list(zip(names,clfs)),voting='soft')
@@ -289,15 +309,16 @@ def predict(f1id=12078,f2id=258):
 #TODO: turn this into a generic function
 def convert_text(df):
 
+    #Grab the recored names for the percentages
     with open('text_based_names.pickle','rb') as f:
         names = pickle.load(f)
 
+    #The preprocessed text fields
     text_based = ['country','association']
 
+    #Iterate through and convert the text fields
     for index, name in enumerate(text_based):
         df[name] = df[name].apply(lambda x: names[index].index(x) / len(names[index]))
-
-
 
     return df
 
